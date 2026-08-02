@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0F5C5C" />
+<title>Petrol Tracker</title>
+<link rel="manifest" href="./manifest.json" />
+<link rel="apple-touch-icon" href="./icon-192.png" />
+<link rel="icon" href="./icon-192.png" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap');
+
+:root {
+  --paper: #FDFCFA;
+  --paper-dim: #F4F2EC;
+  --ink: #16150F;
+  --ink-soft: #55534A;
+  --petrol: #0F5C5C;
+  --petrol-deep: #0A3636;
+  --petrol-tint: #E4EFEE;
+  --amber: #D9720C;
+  --amber-tint: #FBEADA;
+  --line: #E2DFD3;
+  --good: #1E7A34;
+  --good-tint: #E4F3E6;
+  --bad: #B3401A;
+  --bad-tint: #FBE8DF;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+}
+.mono { font-family: 'JetBrains Mono', monospace; }
+.display { font-family: 'Plus Jakarta Sans', sans-serif; }
+button, input, select, textarea { font-family: inherit; }
+
+.header {
+  padding: 22px 18px 16px;
+  border-bottom: 2px solid var(--ink);
+  background: var(--paper);
+}
+.header-row { display: flex; align-items: center; gap: 12px; }
+.header-icon {
+  width: 42px; height: 42px; border-radius: 10px; overflow: hidden; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.header-icon img { width: 100%; height: 100%; }
+.title { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 21px; letter-spacing: -0.02em; margin: 0; }
+.subtitle { font-size: 12.5px; color: var(--ink-soft); margin: 2px 0 0; }
+.service-dot {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--bad);
+  display: inline-block; margin-left: 6px; vertical-align: middle;
+}
+
+.tabs {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; gap: 4px; padding: 10px 14px; overflow-x: auto;
+  background: var(--paper); border-bottom: 1px solid var(--line);
+}
+.tab {
+  font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 13px;
+  padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--line);
+  background: #fff; color: var(--ink-soft); cursor: pointer; white-space: nowrap;
+  transition: all 0.15s ease; position: relative;
+}
+.tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+.tab:not(.active):hover { border-color: var(--petrol); color: var(--petrol); }
+
+.body { padding: 18px; max-width: 900px; margin: 0 auto; padding-bottom: 60px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.card {
+  background: #fff; border: 1.5px solid var(--line); border-radius: 14px;
+  padding: 17px; margin-bottom: 15px;
+}
+.card-title {
+  font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 14.5px;
+  margin: 0 0 13px; display: flex; align-items: center; gap: 7px;
+}
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field.full { grid-column: 1 / -1; }
+.field label { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); }
+.field input, .field select, .field textarea {
+  font-family: 'JetBrains Mono', monospace; font-size: 13.5px;
+  padding: 9px 11px; border-radius: 8px; border: 1.5px solid var(--line);
+  background: var(--paper-dim); color: var(--ink); width: 100%;
+}
+.field select, .field input[type=text] { font-family: 'Inter', sans-serif; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--petrol); background: #fff; }
+.preview-line { grid-column: 1 / -1; font-size: 12px; color: var(--petrol); font-weight: 600; min-height: 14px; }
+.error-line { grid-column: 1 / -1; font-size: 12px; color: var(--bad); font-weight: 600; min-height: 14px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.chip {
+  font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 999px;
+  background: var(--petrol-tint); color: var(--petrol-deep); border: 1px solid transparent; cursor: pointer;
+}
+.chip:hover { border-color: var(--petrol); }
+
+.btn {
+  font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 13.5px;
+  background: var(--petrol); color: #fff; border: none; border-radius: 9px;
+  padding: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn:hover { background: var(--petrol-deep); }
+.btn.secondary { background: #fff; color: var(--petrol); border: 1.5px solid var(--petrol); }
+.btn.secondary:hover { background: var(--petrol-tint); }
+.btn.full { width: 100%; grid-column: 1 / -1; margin-top: 3px; }
+
+.empty { text-align: center; padding: 30px 16px; color: var(--ink-soft); font-size: 13px; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th {
+  font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft);
+  text-align: left; padding: 7px 9px; border-bottom: 2px solid var(--ink); white-space: nowrap;
+}
+td { font-family: 'JetBrains Mono', monospace; padding: 9px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+tr:hover td { background: var(--paper-dim); }
+.badge { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11.5px; padding: 2px 8px; border-radius: 6px; display: inline-block; }
+.badge.good { background: var(--good-tint); color: var(--good); }
+.badge.bad { background: var(--bad-tint); color: var(--bad); }
+.del-btn { background: none; border: none; cursor: pointer; color: var(--ink-soft); padding: 4px 8px; border-radius: 6px; font-size: 15px; }
+.del-btn:hover { color: var(--bad); background: var(--bad-tint); }
+.del-btn.confirm { color: #fff; background: var(--bad); font-size: 10.5px; font-weight: 700; padding: 5px 8px; }
+
+.odo-panel { background: var(--petrol-deep); border-radius: 14px; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; margin-bottom: 15px; }
+.odo-block { display: flex; flex-direction: column; gap: 7px; }
+.odo-label { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 600; font-size: 11px; color: #9FC7C4; text-transform: uppercase; letter-spacing: 0.06em; }
+.odo-row { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+.odo-digit { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 24px; background: #0F4747; color: #F4FBFA; border-radius: 4px; padding: 4px 2px; min-width: 20px; text-align: center; border: 1px solid #1C6363; }
+.odo-dot { color: #9FC7C4; font-weight: 700; font-size: 24px; padding: 0 1px; }
+.odo-suffix { color: #9FC7C4; font-size: 12.5px; font-weight: 600; margin-left: 5px; }
+
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; margin-bottom: 15px; }
+.stat-card { background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 13px; }
+.stat-label { font-size: 10.5px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px; }
+.stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; }
+.stat-sub { font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
+
+.note { font-size: 11.5px; color: var(--ink-soft); background: var(--amber-tint); border: 1px solid #F0D2AC; border-radius: 8px; padding: 8px 10px; display: flex; gap: 7px; align-items: flex-start; margin-bottom: 15px; }
+.chart-card { height: 250px; }
+.chart-card canvas { max-height: 195px; }
+
+.alert-card { border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; gap: 10px; align-items: flex-start; }
+.alert-card.due { background: var(--bad-tint); border: 1.5px solid #E3A88F; }
+.alert-card.ok { background: var(--good-tint); border: 1.5px solid #A9D6AF; }
+.alert-card.neutral { background: var(--petrol-tint); border: 1.5px solid #B8D9D7; }
+.alert-title { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 14.5px; margin: 0 0 3px; }
+.alert-card.due .alert-title { color: var(--bad); }
+.alert-card.ok .alert-title { color: var(--good); }
+.alert-card.neutral .alert-title { color: var(--petrol-deep); }
+.alert-body { font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; }
+
+.notif-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 15px; }
+.notif-status { font-size: 12px; color: var(--ink-soft); }
+
+.doc-cat-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.doc-cat-tab { font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; color: var(--ink-soft); cursor: pointer; }
+.doc-cat-tab.active { background: var(--petrol); color: #fff; border-color: var(--petrol); }
+
+.doc-list { display: flex; flex-direction: column; gap: 8px; }
+.doc-item { display: flex; align-items: center; gap: 11px; border: 1.5px solid var(--line); border-radius: 10px; padding: 9px; }
+.doc-thumb { width: 44px; height: 44px; border-radius: 7px; object-fit: cover; background: var(--paper-dim); flex-shrink: 0; }
+.doc-thumb.pdf { display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: var(--petrol); font-family: 'JetBrains Mono', monospace; }
+.doc-meta { flex: 1; min-width: 0; }
+.doc-name { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-sub { font-size: 11px; color: var(--ink-soft); margin-top: 1px; }
+.doc-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.doc-actions a, .doc-actions button { text-decoration: none; }
+
+@media (max-width: 420px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr; }
+  .odo-digit { font-size: 19px; padding: 3px 1px; min-width: 15px; }
+  .odo-dot { font-size: 19px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-row">
+    <div class="header-icon"><img src="./icon-192.png" alt="" /></div>
+    <div>
+      <p class="title">Petrol Tracker <span id="headerServiceDot"></span></p>
+      <p class="subtitle">Fuel log, mileage, service aur gaadi ke documents</p>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="log" onclick="switchTab('log')">Log</button>
+  <button class="tab" data-tab="insights" onclick="switchTab('insights')">Insights</button>
+  <button class="tab" data-tab="service" onclick="switchTab('service')">Service</button>
+  <button class="tab" data-tab="documents" onclick="switchTab('documents')">Documents</button>
+</div>
+
+<div class="body">
+
+  <!-- LOG TAB -->
+  <div class="tab-panel active" id="panel-log">
+    <div class="card">
+      <p class="card-title">➕ Nayi Fuel Entry</p>
+      <div class="form-grid" id="fuelForm">
+        <div class="field"><label>Date</label><input type="date" id="fDate" /></div>
+        <div class="field"><label>Odometer (km)</label><input type="number" id="fOdo" placeholder="e.g. 24580" /></div>
+        <div class="field"><label>Amount Paid (₹)</label><input type="number" id="fAmount" placeholder="e.g. 1500" /></div>
+        <div class="field"><label>Price per Litre (₹)</label><input type="number" id="fPrice" placeholder="e.g. 104.50" step="0.01" /></div>
+        <div class="preview-line" id="fPreview"></div>
+        <div class="field full">
+          <label>Petrol Pump</label>
+          <input type="text" id="fPump" placeholder="e.g. HP Ambabari" />
+          <div class="chips" id="pumpChips"></div>
+        </div>
+        <div class="field"><label>Cashback (₹, optional)</label><input type="number" id="fCashback" placeholder="0" /></div>
+        <div></div>
+        <div class="error-line" id="fError"></div>
+        <button class="btn full" onclick="handleAddFuel()">➕ Add Entry</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title">📋 History</p>
+      <div id="fuelHistoryWrap"></div>
+    </div>
+  </div>
+
+  <!-- INSIGHTS TAB -->
+  <div class="tab-panel" id="panel-insights">
+    <div id="insightsContent"></div>
+  </div>
+
+  <!-- SERVICE TAB -->
+  <div class="tab-panel" id="panel-service">
+    <div id="serviceStatusWrap"></div>
+
+    <div class="notif-row">
+      <span class="notif-status" id="notifStatus">Reminders off hain</span>
+      <button class="btn secondary" onclick="enableNotifications()">🔔 Enable Reminders</button>
+    </div>
+
+    <div class="card">
+      <p class="card-title">🔧 Service Record Add Karo</p>
+      <div class="form-grid" id="serviceForm">
+        <div class="field"><label>Service Date</label><input type="date" id="sDate" /></div>
+        <div class="field"><label>Odometer (km)</label><input type="number" id="sOdo" placeholder="e.g. 30000" /></div>
+        <div class="field"><label>Cost (₹, optional)</label><input type="number" id="sCost" placeholder="0" /></div>
+        <div class="field"><label>Notes (optional)</label><input type="text" id="sNotes" placeholder="e.g. oil + filter" /></div>
+        <div class="error-line" id="sError"></div>
+        <button class="btn full" onclick="handleAddService()">➕ Add Service Record</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title">🗓️ Service History</p>
+      <div id="serviceHistoryWrap"></div>
+    </div>
+  </div>
+
+  <!-- DOCUMENTS TAB -->
+  <div class="tab-panel" id="panel-documents">
+    <div class="card">
+      <p class="card-title">📎 Document Upload Karo</p>
+      <div class="form-grid" id="docForm">
+        <div class="field"><label>Category</label>
+          <select id="dCategory">
+            <option>Insurance</option>
+            <option>RC</option>
+            <option>Driving License</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Note (optional)</label><input type="text" id="dNote" placeholder="e.g. policy no." /></div>
+        <div class="field full"><label>File (image or PDF)</label><input type="file" id="dFile" accept="image/*,application/pdf" /></div>
+        <div class="error-line" id="dError"></div>
+        <button class="btn full" onclick="handleAddDocument()">⬆️ Upload</button>
+      </div>
+    </div>
+
+    <div class="doc-cat-tabs" id="docCatTabs"></div>
+    <div class="card">
+      <p class="card-title" id="docListTitle">Insurance</p>
+      <div id="docListWrap"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ---------------- IndexedDB helpers ----------------
+const DB_NAME = 'PetrolTrackerDB';
+const DB_VERSION = 1;
+let dbInstance = null;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    if (dbInstance) return resolve(dbInstance);
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('fuel')) db.createObjectStore('fuel', { keyPath: 'id', autoIncrement: true });
+      if (!db.objectStoreNames.contains('service')) db.createObjectStore('service', { keyPath: 'id', autoIncrement: true });
+      if (!db.objectStoreNames.contains('documents')) db.createObjectStore('documents', { keyPath: 'id', autoIncrement: true });
+    };
+    req.onsuccess = (e) => { dbInstance = e.target.result; resolve(dbInstance); };
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+async function dbAdd(store, obj) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).add(obj);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function dbGetAll(store) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function dbDelete(store, id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// ---------------- State ----------------
+let fuelEntries = [];
+let serviceRecords = [];
+let documents = [];
+let activeDocCategory = 'Insurance';
+let confirmDelId = null; // format: "store:id"
+let charts = {};
+
+// ---------------- Utils ----------------
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function fmtINR(n) { if (n == null || isNaN(n)) return "—"; return "₹" + Math.round(n).toLocaleString("en-IN"); }
+function fmtNum(n, d = 1) { if (n == null || isNaN(n)) return "—"; return n.toFixed(d); }
+function fmtDate(iso) { return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }); }
+function fmtDateShort(iso) { return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }); }
+
+function sortedFuel() {
+  return [...fuelEntries].sort((a, b) => (a.date !== b.date ? a.date.localeCompare(b.date) : a.odometer - b.odometer));
+}
+function withMileage() {
+  const s = sortedFuel();
+  return s.map((e, i) => {
+    if (i === 0) return { ...e, kmDriven: null, mileage: null };
+    const prev = s[i - 1];
+    const kmDriven = e.odometer - prev.odometer;
+    const mileage = kmDriven > 0 && e.liters > 0 ? kmDriven / e.liters : null;
+    return { ...e, kmDriven, mileage };
+  });
+}
+function latestOdometer() {
+  let max = null;
+  fuelEntries.forEach((e) => { if (max == null || e.odometer > max) max = e.odometer; });
+  serviceRecords.forEach((e) => { if (max == null || e.odometer > max) max = e.odometer; });
+  return max;
+}
+
+// ---------------- Tab switching ----------------
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('active', p.id === 'panel-' + tab));
+  if (tab === 'insights') renderInsights();
+  if (tab === 'service') renderServiceTab();
+  if (tab === 'documents') renderDocuments();
+}
+
+// ---------------- Fuel: render ----------------
+function renderPumpChips() {
+  const names = [];
+  [...fuelEntries].reverse().forEach((e) => { if (e.pump && !names.includes(e.pump)) names.push(e.pump); });
+  const top = names.slice(0, 6);
+  document.getElementById('pumpChips').innerHTML = top.map((n) =>
+    `<span class="chip" onclick="document.getElementById('fPump').value=${JSON.stringify(n)}">${escapeHtml(n)}</span>`
+  ).join('');
+}
+function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function renderFuelHistory() {
+  const rows = [...withMileage()].reverse();
+  const wrap = document.getElementById('fuelHistoryWrap');
+  if (rows.length === 0) { wrap.innerHTML = '<div class="empty">Koi entry nahi hai abhi. Upar se pehli entry daalo.</div>'; return; }
+  const avgMileage = computeStats() ? computeStats().avgMileage : null;
+  wrap.innerHTML = `<div class="table-wrap"><table><thead><tr>
+    <th>Date</th><th>Odo</th><th>KM Run</th><th>₹/L</th><th>Litres</th><th>Amount</th><th>Cashback</th><th>Pump</th><th>Mileage</th><th></th>
+  </tr></thead><tbody>${rows.map((e) => `
+    <tr>
+      <td>${fmtDate(e.date)}</td>
+      <td>${e.odometer.toLocaleString('en-IN')}</td>
+      <td>${e.kmDriven != null ? e.kmDriven.toLocaleString('en-IN') : '—'}</td>
+      <td>${fmtNum(e.pricePerL, 2)}</td>
+      <td>${fmtNum(e.liters, 2)}</td>
+      <td>${fmtINR(e.amount)}</td>
+      <td>${e.cashback ? fmtINR(e.cashback) : '—'}</td>
+      <td>${e.pump ? escapeHtml(e.pump) : '—'}</td>
+      <td>${e.mileage != null ? `<span class="badge ${avgMileage && e.mileage >= avgMileage ? 'good' : 'bad'}">${fmtNum(e.mileage, 2)} km/l</span>` : '—'}</td>
+      <td>${delBtnHtml('fuel', e.id)}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+function delBtnHtml(store, id) {
+  const key = store + ':' + id;
+  const confirming = confirmDelId === key;
+  return `<button class="del-btn ${confirming ? 'confirm' : ''}" onclick="handleDelete('${store}', ${id})">${confirming ? 'Confirm?' : '🗑️'}</button>`;
+}
+async function handleDelete(store, id) {
+  const key = store + ':' + id;
+  if (confirmDelId === key) {
+    await dbDelete(store, id);
+    if (store === 'fuel') fuelEntries = fuelEntries.filter((e) => e.id !== id);
+    if (store === 'service') serviceRecords = serviceRecords.filter((e) => e.id !== id);
+    if (store === 'documents') documents = documents.filter((e) => e.id !== id);
+    confirmDelId = null;
+    refreshAll();
+  } else {
+    confirmDelId = key;
+    refreshAll();
+    setTimeout(() => { if (confirmDelId === key) { confirmDelId = null; refreshAll(); } }, 3000);
+  }
+}
+
+function updateFuelPreview() {
+  const amt = parseFloat(document.getElementById('fAmount').value);
+  const price = parseFloat(document.getElementById('fPrice').value);
+  const el = document.getElementById('fPreview');
+  if (amt > 0 && price > 0) el.textContent = `≈ ${(amt / price).toFixed(2)} litre`;
+  else el.textContent = '';
+}
+
+async function handleAddFuel() {
+  const date = document.getElementById('fDate').value || todayISO();
+  const odometer = parseFloat(document.getElementById('fOdo').value);
+  const amount = parseFloat(document.getElementById('fAmount').value);
+  const pricePerL = parseFloat(document.getElementById('fPrice').value);
+  const pump = document.getElementById('fPump').value.trim();
+  const cashback = parseFloat(document.getElementById('fCashback').value) || 0;
+  const errEl = document.getElementById('fError');
+  errEl.textContent = '';
+
+  if (!odometer || !amount || !pricePerL) { errEl.textContent = 'Odometer, amount aur price per litre bharo.'; return; }
+  if (odometer <= 0 || amount <= 0 || pricePerL <= 0) { errEl.textContent = 'Values positive hone chahiye.'; return; }
+  const lastEntry = sortedFuel()[sortedFuel().length - 1];
+  if (lastEntry && date >= lastEntry.date && odometer < lastEntry.odometer) {
+    errEl.textContent = `Odometer pichhli entry (${lastEntry.odometer} km) se kam hai.`;
+    return;
+  }
+  const liters = amount / pricePerL;
+  const entry = { date, odometer, amount, pricePerL, liters, pump, cashback };
+  const id = await dbAdd('fuel', entry);
+  fuelEntries.push({ ...entry, id });
+
+  document.getElementById('fOdo').value = '';
+  document.getElementById('fAmount').value = '';
+  document.getElementById('fPrice').value = '';
+  document.getElementById('fPump').value = '';
+  document.getElementById('fCashback').value = '';
+  document.getElementById('fDate').value = todayISO();
+  updateFuelPreview();
+  refreshAll();
+}
+
+// ---------------- Insights ----------------
+function computeStats() {
+  const s = sortedFuel();
+  if (s.length === 0) return null;
+  const wm = withMileage();
+  const totalSpend = s.reduce((a, e) => a + Number(e.amount), 0);
+  const totalCashback = s.reduce((a, e) => a + Number(e.cashback || 0), 0);
+  const totalLiters = s.reduce((a, e) => a + Number(e.liters), 0);
+  const totalKm = s.length >= 2 ? s[s.length - 1].odometer - s[0].odometer : 0;
+  const litersForMileage = wm.slice(1).reduce((a, e) => a + Number(e.liters), 0);
+  const avgMileage = litersForMileage > 0 ? totalKm / litersForMileage : null;
+  const avgPricePerL = totalLiters > 0 ? totalSpend / totalLiters : null;
+  const costPerKm = totalKm > 0 ? totalSpend / totalKm : null;
+  const mileageEntries = wm.filter((e) => e.mileage != null);
+  const best = mileageEntries.length ? mileageEntries.reduce((a, b) => (b.mileage > a.mileage ? b : a)) : null;
+  const worst = mileageEntries.length ? mileageEntries.reduce((a, b) => (b.mileage < a.mileage ? b : a)) : null;
+  let avgGapDays = null;
+  if (s.length >= 2) {
+    const totalDays = (new Date(s[s.length - 1].date) - new Date(s[0].date)) / 86400000;
+    avgGapDays = totalDays / (s.length - 1);
+  }
+  const monthlyMap = {};
+  s.forEach((e) => { const k = e.date.slice(0, 7); monthlyMap[k] = (monthlyMap[k] || 0) + Number(e.amount); });
+  const monthly = Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => ({ label: new Date(k + '-01').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }), spend: Math.round(v) }));
+  const mileageTrend = mileageEntries.map((e) => ({ label: fmtDateShort(e.date), mileage: Number(e.mileage.toFixed(2)) }));
+  const priceTrend = s.map((e) => ({ label: fmtDateShort(e.date), price: Number(e.pricePerL.toFixed(2)) }));
+  return { totalSpend, totalCashback, netSpend: totalSpend - totalCashback, totalLiters, totalKm, avgMileage, avgPricePerL, costPerKm, best, worst, avgGapDays, monthly, mileageTrend, priceTrend, fillCount: s.length };
+}
+
+function odoDigitsHtml(value, digits, decimals, suffix) {
+  let str;
+  if (value == null || isNaN(value)) str = '-'.repeat(decimals > 0 ? digits + decimals + 1 : digits);
+  else str = value.toFixed(decimals).padStart(decimals > 0 ? digits + decimals + 1 : digits, '0');
+  const spans = str.split('').map((c) => c === '.' || c === '-' ? `<span class="odo-dot">${c}</span>` : `<span class="odo-digit">${c}</span>`).join('');
+  return `<div class="odo-row">${spans}${suffix ? `<span class="odo-suffix">${suffix}</span>` : ''}</div>`;
+}
+
+function destroyChart(key) { if (charts[key]) { charts[key].destroy(); delete charts[key]; } }
+
+function renderInsights() {
+  const stats = computeStats();
+  const el = document.getElementById('insightsContent');
+  if (!stats) { el.innerHTML = '<div class="card"><div class="empty">Insights ke liye pehle Log tab mein entries daalo.</div></div>'; return; }
+
+  el.innerHTML = `
+    <div class="odo-panel">
+      <div class="odo-block"><span class="odo-label">Total Distance Driven</span>${odoDigitsHtml(stats.totalKm, 6, 0, 'km')}</div>
+      <div class="odo-block"><span class="odo-label">Average Mileage</span>${odoDigitsHtml(stats.avgMileage, 2, 2, 'km/l')}</div>
+    </div>
+    <div class="note">ℹ️ Mileage calc har fill-up ko "full tank" maan ke hoti hai — odometer difference ÷ agli baar dalwaye litres.</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Total Spend</div><div class="stat-value">${fmtINR(stats.totalSpend)}</div><div class="stat-sub">${stats.fillCount} fill-ups</div></div>
+      <div class="stat-card"><div class="stat-label">Net Spend</div><div class="stat-value">${fmtINR(stats.netSpend)}</div><div class="stat-sub">cashback ${fmtINR(stats.totalCashback)} ghata ke</div></div>
+      <div class="stat-card"><div class="stat-label">Total Litres</div><div class="stat-value">${fmtNum(stats.totalLiters, 1)} L</div><div class="stat-sub">avg ${fmtINR(stats.avgPricePerL)}/L</div></div>
+      <div class="stat-card"><div class="stat-label">Cost per KM</div><div class="stat-value">${stats.costPerKm != null ? '₹' + fmtNum(stats.costPerKm, 2) : '—'}</div><div class="stat-sub">running cost</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Refuel Gap</div><div class="stat-value">${stats.avgGapDays != null ? fmtNum(stats.avgGapDays, 1) + 'd' : '—'}</div><div class="stat-sub">between fill-ups</div></div>
+      <div class="stat-card"><div class="stat-label">Cashback Earned</div><div class="stat-value" style="color:var(--good)">${fmtINR(stats.totalCashback)}</div><div class="stat-sub">total tak</div></div>
+      ${stats.best ? `<div class="stat-card"><div class="stat-label">Best Mileage</div><div class="stat-value" style="color:var(--good)">${fmtNum(stats.best.mileage, 2)} km/l</div><div class="stat-sub">${fmtDateShort(stats.best.date)}</div></div>` : ''}
+      ${stats.worst ? `<div class="stat-card"><div class="stat-label">Worst Mileage</div><div class="stat-value" style="color:var(--bad)">${fmtNum(stats.worst.mileage, 2)} km/l</div><div class="stat-sub">${fmtDateShort(stats.worst.date)}</div></div>` : ''}
+    </div>
+    ${stats.monthly.length ? `<div class="card chart-card"><p class="card-title">Monthly Spend</p><canvas id="chartMonthly"></canvas></div>` : ''}
+    ${stats.mileageTrend.length ? `<div class="card chart-card"><p class="card-title">Mileage Trend</p><canvas id="chartMileage"></canvas></div>` : ''}
+    ${stats.priceTrend.length ? `<div class="card chart-card"><p class="card-title">Fuel Price Trend (₹/L)</p><canvas id="chartPrice"></canvas></div>` : ''}
+  `;
+
+  destroyChart('monthly'); destroyChart('mileage'); destroyChart('price');
+  const fontFamily = "'JetBrains Mono', monospace";
+  if (stats.monthly.length) {
+    charts.monthly = new Chart(document.getElementById('chartMonthly'), {
+      type: 'bar',
+      data: { labels: stats.monthly.map((m) => m.label), datasets: [{ data: stats.monthly.map((m) => m.spend), backgroundColor: '#0F5C5C', borderRadius: 5 }] },
+      options: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => fmtINR(c.parsed.y) } } },
+        scales: { x: { ticks: { font: { family: fontFamily, size: 10.5 } }, grid: { display: false } }, y: { ticks: { font: { family: fontFamily, size: 10.5 } }, grid: { color: '#E2DFD3' } } },
+        maintainAspectRatio: false }
+    });
+  }
+  if (stats.mileageTrend.length) {
+    charts.mileage = new Chart(document.getElementById('chartMileage'), {
+      type: 'line',
+      data: { labels: stats.mileageTrend.map((m) => m.label), datasets: [{ data: stats.mileageTrend.map((m) => m.mileage), borderColor: '#D9720C', backgroundColor: '#D9720C', tension: 0.3, pointRadius: 3 }] },
+      options: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => c.parsed.y + ' km/l' } } },
+        scales: { x: { ticks: { font: { family: fontFamily, size: 10.5 } }, grid: { display: false } }, y: { ticks: { font: { family: fontFamily, size: 10.5 } }, grid: { color: '#E2DFD3' } } },
+        maintainAspectRatio: false }
+    });
+  }
+  if (stats.priceTrend.length) {
+    charts.price = new Chart(document.getElementById('chartPrice'), {
+      type: 'line',
+      data: { labels: stats.priceTrend.map((m) => m.label), datasets: [{ data: stats.priceTrend.map((m) => m.price), borderColor: '#0F5C5C', backgroundColor: '#0F5C5C', tension: 0.3, pointRadius: 3 }] },
+      options: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => '₹' + c.parsed.y + '/L' } } },
+        scales: { x: { ticks: { font: { family: fontFamily, size: 10.5 } }, grid: { display: false } }, y: { ticks: { font: { family: fontFamily, size: 10.5 } }, grid: { color: '#E2DFD3' } } },
+        maintainAspectRatio: false }
+    });
+  }
+}
+
+// ---------------- Service ----------------
+const SERVICE_KM_INTERVAL = 10000;
+const SERVICE_DAY_INTERVAL = 365;
+
+function computeServiceStatus() {
+  const odo = latestOdometer();
+  if (serviceRecords.length === 0) {
+    return { hasBaseline: false };
+  }
+  const last = [...serviceRecords].sort((a, b) => (b.date !== a.date ? b.date.localeCompare(a.date) : b.odometer - a.odometer))[0];
+  const kmSince = odo != null ? odo - last.odometer : 0;
+  const daysSince = (new Date() - new Date(last.date)) / 86400000;
+  const dueByKm = kmSince >= SERVICE_KM_INTERVAL;
+  const dueByTime = daysSince >= SERVICE_DAY_INTERVAL;
+  const kmRemaining = Math.max(0, SERVICE_KM_INTERVAL - kmSince);
+  const daysRemaining = Math.max(0, SERVICE_DAY_INTERVAL - daysSince);
+  return { hasBaseline: true, last, kmSince, daysSince, dueByKm, dueByTime, due: dueByKm || dueByTime, kmRemaining, daysRemaining };
+}
+
+function renderServiceStatus() {
+  const status = computeServiceStatus();
+  const wrap = document.getElementById('serviceStatusWrap');
+  const dot = document.getElementById('headerServiceDot');
+  if (!status.hasBaseline) {
+    dot.innerHTML = '';
+    wrap.innerHTML = `<div class="alert-card neutral"><div><p class="alert-title">Baseline set karo</p><p class="alert-body">Pehli service record daalo (last service kab hui thi, uss waqt odometer kya tha) taaki agli service due date/km track ho sake.</p></div></div>`;
+    return;
+  }
+  if (status.due) {
+    dot.innerHTML = '<span class="service-dot"></span>';
+    const reasons = [];
+    if (status.dueByKm) reasons.push(`${Math.round(status.kmSince).toLocaleString('en-IN')} km ho chuke pichhli service ke baad`);
+    if (status.dueByTime) reasons.push(`${Math.round(status.daysSince)} din ho chuke pichhli service ko`);
+    wrap.innerHTML = `<div class="alert-card due"><div><p class="alert-title">⚠️ Service Due Hai</p><p class="alert-body">${reasons.join(' aur ')}. 10,000 km ya 1 saal — jo pehle aaye, uss hisaab se service karwa lo.</p></div></div>`;
+    maybeNotify(status);
+  } else {
+    dot.innerHTML = '';
+    wrap.innerHTML = `<div class="alert-card ok"><div><p class="alert-title">✅ Service Up To Date</p><p class="alert-body">Agli service ~${Math.round(status.kmRemaining).toLocaleString('en-IN')} km ya ${Math.round(status.daysRemaining)} din mein due hai — jo pehle aaye.</p></div></div>`;
+  }
+}
+
+function renderServiceHistory() {
+  const rows = [...serviceRecords].sort((a, b) => b.date.localeCompare(a.date));
+  const wrap = document.getElementById('serviceHistoryWrap');
+  if (rows.length === 0) { wrap.innerHTML = '<div class="empty">Koi service record nahi hai abhi.</div>'; return; }
+  wrap.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Odo</th><th>Cost</th><th>Notes</th><th></th></tr></thead><tbody>
+    ${rows.map((e) => `<tr><td>${fmtDate(e.date)}</td><td>${e.odometer.toLocaleString('en-IN')}</td><td>${e.cost ? fmtINR(e.cost) : '—'}</td><td>${e.notes ? escapeHtml(e.notes) : '—'}</td><td>${delBtnHtml('service', e.id)}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+function renderNotifStatus() {
+  const enabled = localStorage.getItem('notificationsEnabled') === 'true';
+  document.getElementById('notifStatus').textContent = enabled ? '🔔 Reminders on hain' : 'Reminders off hain';
+}
+
+async function enableNotifications() {
+  if (!('Notification' in window)) { alert('Ye browser notifications support nahi karta.'); return; }
+  const perm = await Notification.requestPermission();
+  localStorage.setItem('notificationsEnabled', perm === 'granted' ? 'true' : 'false');
+  renderNotifStatus();
+  if (perm === 'granted') renderServiceStatus();
+}
+
+function maybeNotify(status) {
+  if (!status.due) return;
+  if (localStorage.getItem('notificationsEnabled') !== 'true') return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const today = todayISO();
+  if (localStorage.getItem('lastServiceNotifyDate') === today) return;
+  localStorage.setItem('lastServiceNotifyDate', today);
+  const body = status.dueByKm
+    ? `${Math.round(status.kmSince)} km ho gaye pichhli service ke baad.`
+    : `${Math.round(status.daysSince)} din ho gaye pichhli service ko.`;
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'SHOW_NOTIFICATION', title: 'Gaadi Service Due!', body });
+  } else if (Notification.permission === 'granted') {
+    new Notification('Gaadi Service Due!', { body, icon: './icon-192.png' });
+  }
+}
+
+function renderServiceTab() {
+  renderServiceStatus();
+  renderNotifStatus();
+  renderServiceHistory();
+}
+
+async function handleAddService() {
+  const date = document.getElementById('sDate').value || todayISO();
+  const odometer = parseFloat(document.getElementById('sOdo').value);
+  const cost = parseFloat(document.getElementById('sCost').value) || 0;
+  const notes = document.getElementById('sNotes').value.trim();
+  const errEl = document.getElementById('sError');
+  errEl.textContent = '';
+  if (!odometer || odometer <= 0) { errEl.textContent = 'Odometer reading bharo.'; return; }
+
+  const entry = { date, odometer, cost, notes };
+  const id = await dbAdd('service', entry);
+  serviceRecords.push({ ...entry, id });
+
+  document.getElementById('sOdo').value = '';
+  document.getElementById('sCost').value = '';
+  document.getElementById('sNotes').value = '';
+  document.getElementById('sDate').value = todayISO();
+  renderServiceTab();
+}
+
+// ---------------- Documents ----------------
+const DOC_CATEGORIES = ['Insurance', 'RC', 'Driving License', 'Other'];
+
+function renderDocCatTabs() {
+  document.getElementById('docCatTabs').innerHTML = DOC_CATEGORIES.map((c) =>
+    `<button class="doc-cat-tab ${c === activeDocCategory ? 'active' : ''}" onclick="setDocCategory('${c}')">${c}</button>`
+  ).join('');
+}
+function setDocCategory(c) { activeDocCategory = c; renderDocuments(); }
+
+function renderDocuments() {
+  renderDocCatTabs();
+  document.getElementById('docListTitle').textContent = activeDocCategory;
+  const items = documents.filter((d) => d.category === activeDocCategory).sort((a, b) => b.uploadedDate.localeCompare(a.uploadedDate));
+  const wrap = document.getElementById('docListWrap');
+  if (items.length === 0) { wrap.innerHTML = `<div class="empty">Is category mein koi document nahi hai abhi.</div>`; return; }
+  wrap.innerHTML = `<div class="doc-list">${items.map((d) => {
+    const isImg = d.mimeType.startsWith('image/');
+    const thumb = isImg ? `<img class="doc-thumb" src="${d.dataUrl}" />` : `<div class="doc-thumb pdf">PDF</div>`;
+    return `<div class="doc-item">
+      ${thumb}
+      <div class="doc-meta">
+        <div class="doc-name">${escapeHtml(d.fileName)}</div>
+        <div class="doc-sub">${fmtDate(d.uploadedDate)}${d.note ? ' · ' + escapeHtml(d.note) : ''}</div>
+      </div>
+      <div class="doc-actions">
+        <a href="${d.dataUrl}" download="${escapeHtml(d.fileName)}" class="btn secondary" style="padding:6px 9px;font-size:11px;">View</a>
+        ${delBtnHtml('documents', d.id)}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+async function handleAddDocument() {
+  const category = document.getElementById('dCategory').value;
+  const note = document.getElementById('dNote').value.trim();
+  const fileInput = document.getElementById('dFile');
+  const errEl = document.getElementById('dError');
+  errEl.textContent = '';
+  const file = fileInput.files[0];
+  if (!file) { errEl.textContent = 'File select karo.'; return; }
+  if (file.size > 8 * 1024 * 1024) { errEl.textContent = 'File 8MB se chhoti honi chahiye.'; return; }
+
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const entry = { category, note, fileName: file.name, mimeType: file.type || 'application/octet-stream', dataUrl, uploadedDate: todayISO() };
+  const id = await dbAdd('documents', entry);
+  documents.push({ ...entry, id });
+
+  document.getElementById('dNote').value = '';
+  fileInput.value = '';
+  activeDocCategory = category;
+  renderDocuments();
+}
+
+// ---------------- Init ----------------
+function refreshAll() {
+  renderPumpChips();
+  renderFuelHistory();
+  const activePanel = document.querySelector('.tab-panel.active').id;
+  if (activePanel === 'panel-insights') renderInsights();
+  if (activePanel === 'panel-service') renderServiceTab();
+  if (activePanel === 'panel-documents') renderDocuments();
+  renderServiceStatus(); // keep header dot fresh regardless of tab
+}
+
+async function init() {
+  document.getElementById('fDate').value = todayISO();
+  document.getElementById('sDate').value = todayISO();
+  document.getElementById('fAmount').addEventListener('input', updateFuelPreview);
+  document.getElementById('fPrice').addEventListener('input', updateFuelPreview);
+
+  fuelEntries = await dbGetAll('fuel');
+  serviceRecords = await dbGetAll('service');
+  documents = await dbGetAll('documents');
+
+  renderPumpChips();
+  renderFuelHistory();
+  renderServiceStatus();
+  renderNotifStatus();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  }
+}
+init();
+</script>
+</body>
+</html>
