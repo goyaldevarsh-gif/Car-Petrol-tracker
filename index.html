@@ -180,6 +180,32 @@ tr:hover td { background: var(--paper-dim); }
 .doc-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .doc-actions a, .doc-actions button { text-decoration: none; }
 
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(20,18,14,0.55);
+  z-index: 100; align-items: center; justify-content: center; padding: 16px;
+}
+.modal-overlay.open { display: flex; }
+.modal-card {
+  background: #fff; border-radius: 14px; max-width: 520px; width: 100%;
+  max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;
+}
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1.5px solid var(--line); }
+.modal-title { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 15px; margin: 0; }
+.modal-close { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--ink-soft); padding: 4px 9px; border-radius: 6px; }
+.modal-close:hover { background: var(--paper-dim); }
+.modal-body { padding: 8px 16px 16px; overflow-y: auto; }
+.maint-table th:first-child, .maint-table td:first-child { font-family: 'Inter', sans-serif; font-weight: 600; white-space: normal; }
+.maint-table td:last-child { color: var(--ink-soft); white-space: normal; font-family: 'Inter', sans-serif; font-size: 12px; }
+.maint-table th:last-child { white-space: normal; }
+
+.toast {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 600;
+  padding: 10px 18px; border-radius: 999px; opacity: 0; pointer-events: none;
+  transition: all 0.25s ease; z-index: 200; max-width: 90%; text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 @media (max-width: 420px) {
   .form-grid { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: 1fr; }
@@ -246,6 +272,8 @@ tr:hover td { background: var(--paper-dim); }
   <div class="tab-panel" id="panel-service">
     <div id="serviceStatusWrap"></div>
 
+    <button class="btn secondary full" style="margin-bottom:15px;" onclick="openMaintModal()">📖 5-Saal Maintenance Schedule Dekho</button>
+
     <div class="notif-row">
       <span class="notif-status" id="notifStatus">Reminders off hain</span>
       <button class="btn secondary" onclick="enableNotifications()">🔔 Enable Reminders</button>
@@ -272,6 +300,16 @@ tr:hover td { background: var(--paper-dim); }
   <!-- DOCUMENTS TAB -->
   <div class="tab-panel" id="panel-documents">
     <div class="card">
+      <p class="card-title">🛡️ Insurance &amp; PUC Reminders</p>
+      <div class="form-grid">
+        <div class="field"><label>Last Insurance Renewal</label><input type="date" id="lastInsuranceDate" onchange="saveVehicleMeta()" /></div>
+        <div class="field"><label>Last PUC Date</label><input type="date" id="lastPucDate" onchange="saveVehicleMeta()" /></div>
+      </div>
+      <div id="insurancePucStatus" style="margin-top:11px;"></div>
+      <p class="stat-sub" style="margin-top:8px;">Reminders on/off Service tab se control hote hain.</p>
+    </div>
+
+    <div class="card">
       <p class="card-title">📎 Document Upload Karo</p>
       <div class="form-grid" id="docForm">
         <div class="field"><label>Category</label>
@@ -294,8 +332,52 @@ tr:hover td { background: var(--paper-dim); }
       <p class="card-title" id="docListTitle">Insurance</p>
       <div id="docListWrap"></div>
     </div>
+
+    <div class="card">
+      <p class="card-title">💾 Backup &amp; Restore</p>
+      <p class="stat-sub" id="backupStatus" style="margin-bottom:11px;">—</p>
+      <div class="form-grid">
+        <button class="btn secondary" onclick="exportBackup(false)">⬇️ Export Backup</button>
+        <label class="btn secondary" style="cursor:pointer;">⬆️ Import Backup
+          <input type="file" accept="application/json,.json" style="display:none;" onchange="handleImportFile(event)" />
+        </label>
+      </div>
+      <p class="stat-sub" style="margin-top:11px;">Har hafte app kholne par automatic backup file download ho jaati hai (agar data hai toh).</p>
+    </div>
   </div>
 
+</div>
+
+<div class="modal-overlay" id="maintModalOverlay" onclick="closeMaintModalOnOverlay(event)">
+  <div class="modal-card">
+    <div class="modal-header">
+      <p class="modal-title">📖 5-Saal Car — Maintenance Schedule</p>
+      <button class="modal-close" onclick="closeMaintModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="table-wrap">
+        <table class="maint-table">
+          <thead><tr><th>Item</th><th>Kab check/replace karna chahiye</th></tr></thead>
+          <tbody>
+            <tr><td>Engine Oil + Oil Filter</td><td>Har 10,000 km / 1 year</td></tr>
+            <tr><td>Air Filter</td><td>15–20k km (dusty area mein jaldi)</td></tr>
+            <tr><td>Cabin (AC) Filter</td><td>Har 10–15k km</td></tr>
+            <tr><td>Spark Plugs (Iridium)</td><td>~60,000 km</td></tr>
+            <tr><td>Brake Fluid</td><td>Har 2–3 saal</td></tr>
+            <tr><td>Coolant</td><td>5 saal ya ~1,00,000 km (agar pehle replace nahi hua)</td></tr>
+            <tr><td>Transmission Oil (AMT)</td><td>Usually inspect; kai owners preventive replacement 60–80k km ke around karwa dete hain</td></tr>
+            <tr><td>Battery</td><td>4–5 saal average life</td></tr>
+            <tr><td>Wheel Alignment</td><td>8–10k km ya jab steering pull kare</td></tr>
+            <tr><td>Wheel Balancing</td><td>Tyre rotation ke saath</td></tr>
+            <tr><td>Tyre Rotation</td><td>Har 10,000 km</td></tr>
+            <tr><td>Tyres</td><td>5–6 saal ya tread &lt;1.6 mm</td></tr>
+            <tr><td>Wiper Blades</td><td>1–2 saal</td></tr>
+            <tr><td>AC Service</td><td>2–3 saal ya cooling kam ho</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -345,6 +427,15 @@ async function dbDelete(store, id) {
     req.onerror = () => reject(req.error);
   });
 }
+async function dbClear(store) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
 
 // ---------------- State ----------------
 let fuelEntries = [];
@@ -379,6 +470,26 @@ function latestOdometer() {
   fuelEntries.forEach((e) => { if (max == null || e.odometer > max) max = e.odometer; });
   serviceRecords.forEach((e) => { if (max == null || e.odometer > max) max = e.odometer; });
   return max;
+}
+
+// ---------------- Vehicle reminders (Insurance / PUC) ----------------
+function computeAnnualStatus(lastDateStr) {
+  if (!lastDateStr) return { hasDate: false };
+  const last = new Date(lastDateStr);
+  const due = new Date(last);
+  due.setFullYear(due.getFullYear() + 1);
+  const daysRemaining = Math.floor((due - new Date()) / 86400000);
+  return { hasDate: true, due, daysRemaining, overdue: daysRemaining < 0, dueSoon: daysRemaining >= 0 && daysRemaining <= 30 };
+}
+function anyReminderDue() {
+  const svc = computeServiceStatus();
+  const svcDue = svc.hasBaseline && svc.due;
+  const ins = computeAnnualStatus(localStorage.getItem('lastInsuranceDate'));
+  const puc = computeAnnualStatus(localStorage.getItem('lastPucDate'));
+  return svcDue || (ins.hasDate && (ins.overdue || ins.dueSoon)) || (puc.hasDate && (puc.overdue || puc.dueSoon));
+}
+function updateHeaderDot() {
+  document.getElementById('headerServiceDot').innerHTML = anyReminderDue() ? '<span class="service-dot"></span>' : '';
 }
 
 // ---------------- Tab switching ----------------
@@ -603,23 +714,24 @@ function computeServiceStatus() {
 function renderServiceStatus() {
   const status = computeServiceStatus();
   const wrap = document.getElementById('serviceStatusWrap');
-  const dot = document.getElementById('headerServiceDot');
   if (!status.hasBaseline) {
-    dot.innerHTML = '';
     wrap.innerHTML = `<div class="alert-card neutral"><div><p class="alert-title">Baseline set karo</p><p class="alert-body">Pehli service record daalo (last service kab hui thi, uss waqt odometer kya tha) taaki agli service due date/km track ho sake.</p></div></div>`;
+    updateHeaderDot();
     return;
   }
   if (status.due) {
-    dot.innerHTML = '<span class="service-dot"></span>';
     const reasons = [];
     if (status.dueByKm) reasons.push(`${Math.round(status.kmSince).toLocaleString('en-IN')} km ho chuke pichhli service ke baad`);
     if (status.dueByTime) reasons.push(`${Math.round(status.daysSince)} din ho chuke pichhli service ko`);
     wrap.innerHTML = `<div class="alert-card due"><div><p class="alert-title">⚠️ Service Due Hai</p><p class="alert-body">${reasons.join(' aur ')}. 10,000 km ya 1 saal — jo pehle aaye, uss hisaab se service karwa lo.</p></div></div>`;
-    maybeNotify(status);
+    const body = status.dueByKm
+      ? `${Math.round(status.kmSince)} km ho gaye pichhli service ke baad.`
+      : `${Math.round(status.daysSince)} din ho gaye pichhli service ko.`;
+    maybeNotifyGeneric('service', 'Gaadi Service Due!', body, true);
   } else {
-    dot.innerHTML = '';
     wrap.innerHTML = `<div class="alert-card ok"><div><p class="alert-title">✅ Service Up To Date</p><p class="alert-body">Agli service ~${Math.round(status.kmRemaining).toLocaleString('en-IN')} km ya ${Math.round(status.daysRemaining)} din mein due hai — jo pehle aaye.</p></div></div>`;
   }
+  updateHeaderDot();
 }
 
 function renderServiceHistory() {
@@ -641,23 +753,21 @@ async function enableNotifications() {
   const perm = await Notification.requestPermission();
   localStorage.setItem('notificationsEnabled', perm === 'granted' ? 'true' : 'false');
   renderNotifStatus();
-  if (perm === 'granted') renderServiceStatus();
+  if (perm === 'granted') { renderServiceStatus(); renderInsurancePucStatus(); }
 }
 
-function maybeNotify(status) {
-  if (!status.due) return;
+function maybeNotifyGeneric(key, title, body, isDue) {
+  if (!isDue) return;
   if (localStorage.getItem('notificationsEnabled') !== 'true') return;
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const today = todayISO();
-  if (localStorage.getItem('lastServiceNotifyDate') === today) return;
-  localStorage.setItem('lastServiceNotifyDate', today);
-  const body = status.dueByKm
-    ? `${Math.round(status.kmSince)} km ho gaye pichhli service ke baad.`
-    : `${Math.round(status.daysSince)} din ho gaye pichhli service ko.`;
+  const lastKey = 'lastNotify_' + key;
+  if (localStorage.getItem(lastKey) === today) return;
+  localStorage.setItem(lastKey, today);
   if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.controller.postMessage({ type: 'SHOW_NOTIFICATION', title: 'Gaadi Service Due!', body });
+    navigator.serviceWorker.controller.postMessage({ type: 'SHOW_NOTIFICATION', title, body });
   } else if (Notification.permission === 'granted') {
-    new Notification('Gaadi Service Due!', { body, icon: './icon-192.png' });
+    new Notification(title, { body, icon: './icon-192.png' });
   }
 }
 
@@ -686,6 +796,45 @@ async function handleAddService() {
   document.getElementById('sDate').value = todayISO();
   renderServiceTab();
 }
+
+// ---------------- Insurance / PUC reminders ----------------
+function renderReminderChip(label, status) {
+  if (!status.hasDate) {
+    return `<div class="alert-card neutral" style="margin-bottom:8px;"><div><p class="alert-title">${label} — date daal do</p></div></div>`;
+  }
+  const dueStr = fmtDate(status.due.toISOString().slice(0, 10));
+  if (status.overdue) {
+    return `<div class="alert-card due" style="margin-bottom:8px;"><div><p class="alert-title">⚠️ ${label} Pending Hai</p><p class="alert-body">${Math.abs(status.daysRemaining)} din pehle due tha (${dueStr}). Renew karwa lo.</p></div></div>`;
+  }
+  if (status.dueSoon) {
+    return `<div class="alert-card due" style="margin-bottom:8px;"><div><p class="alert-title">⏰ ${label} Jald Due Hai</p><p class="alert-body">${status.daysRemaining} din baaki hain (due: ${dueStr}).</p></div></div>`;
+  }
+  return `<div class="alert-card ok" style="margin-bottom:8px;"><div><p class="alert-title">✅ ${label} OK Hai</p><p class="alert-body">${status.daysRemaining} din baaki hain (due: ${dueStr}).</p></div></div>`;
+}
+function renderInsurancePucStatus() {
+  const ins = computeAnnualStatus(localStorage.getItem('lastInsuranceDate'));
+  const puc = computeAnnualStatus(localStorage.getItem('lastPucDate'));
+  document.getElementById('insurancePucStatus').innerHTML = renderReminderChip('Insurance', ins) + renderReminderChip('PUC', puc);
+  maybeNotifyGeneric('insurance', 'Insurance Renewal Due!', ins.overdue ? `Insurance ${Math.abs(ins.daysRemaining)} din pehle expire ho gaya.` : `Insurance ${ins.daysRemaining} din mein due hai.`, ins.hasDate && (ins.overdue || ins.dueSoon));
+  maybeNotifyGeneric('puc', 'PUC Renewal Due!', puc.overdue ? `PUC ${Math.abs(puc.daysRemaining)} din pehle expire ho gaya.` : `PUC ${puc.daysRemaining} din mein due hai.`, puc.hasDate && (puc.overdue || puc.dueSoon));
+  updateHeaderDot();
+}
+function loadVehicleMeta() {
+  document.getElementById('lastInsuranceDate').value = localStorage.getItem('lastInsuranceDate') || '';
+  document.getElementById('lastPucDate').value = localStorage.getItem('lastPucDate') || '';
+  renderInsurancePucStatus();
+}
+function saveVehicleMeta() {
+  localStorage.setItem('lastInsuranceDate', document.getElementById('lastInsuranceDate').value || '');
+  localStorage.setItem('lastPucDate', document.getElementById('lastPucDate').value || '');
+  renderInsurancePucStatus();
+}
+
+// ---------------- Maintenance schedule modal ----------------
+function openMaintModal() { document.getElementById('maintModalOverlay').classList.add('open'); }
+function closeMaintModal() { document.getElementById('maintModalOverlay').classList.remove('open'); }
+function closeMaintModalOnOverlay(e) { if (e.target.id === 'maintModalOverlay') closeMaintModal(); }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMaintModal(); });
 
 // ---------------- Documents ----------------
 const DOC_CATEGORIES = ['Insurance', 'RC', 'Driving License', 'Other'];
@@ -747,6 +896,118 @@ async function handleAddDocument() {
   renderDocuments();
 }
 
+// ---------------- Toast ----------------
+function showToast(msg) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ---------------- Backup & Restore ----------------
+const BACKUP_INTERVAL_DAYS = 7;
+
+function buildBackupObject() {
+  return {
+    app: 'petrol-tracker',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    fuel: fuelEntries,
+    service: serviceRecords,
+    documents: documents,
+    vehicleMeta: {
+      lastInsuranceDate: localStorage.getItem('lastInsuranceDate') || '',
+      lastPucDate: localStorage.getItem('lastPucDate') || ''
+    }
+  };
+}
+
+async function exportBackup(auto) {
+  try {
+    const data = buildBackupObject();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `petrol-tracker-backup-${todayISO()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    localStorage.setItem('lastBackupTimestamp', String(Date.now()));
+    renderBackupStatus();
+    showToast(auto ? '📦 Automatic backup ho gaya (Downloads mein)' : '📦 Backup downloaded ho gaya');
+  } catch (err) {
+    if (!auto) showToast('Backup fail hua: ' + err.message);
+  }
+}
+
+async function handleImportFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!data || !Array.isArray(data.fuel) || !Array.isArray(data.service) || !Array.isArray(data.documents)) {
+      showToast('Ye valid backup file nahi lag rahi.');
+      event.target.value = '';
+      return;
+    }
+    const ok = confirm('Ye current saara data replace kar dega is backup file se. Continue karein?');
+    if (!ok) { event.target.value = ''; return; }
+
+    await dbClear('fuel');
+    await dbClear('service');
+    await dbClear('documents');
+    for (const e of data.fuel) { const { id, ...rest } = e; await dbAdd('fuel', rest); }
+    for (const e of data.service) { const { id, ...rest } = e; await dbAdd('service', rest); }
+    for (const e of data.documents) { const { id, ...rest } = e; await dbAdd('documents', rest); }
+
+    if (data.vehicleMeta) {
+      localStorage.setItem('lastInsuranceDate', data.vehicleMeta.lastInsuranceDate || '');
+      localStorage.setItem('lastPucDate', data.vehicleMeta.lastPucDate || '');
+    }
+
+    fuelEntries = await dbGetAll('fuel');
+    serviceRecords = await dbGetAll('service');
+    documents = await dbGetAll('documents');
+
+    loadVehicleMeta();
+    refreshAll();
+    event.target.value = '';
+    showToast('✅ Backup restore ho gaya');
+  } catch (err) {
+    showToast('Import fail hua: ' + err.message);
+    event.target.value = '';
+  }
+}
+
+function renderBackupStatus() {
+  const el = document.getElementById('backupStatus');
+  if (!el) return;
+  const last = localStorage.getItem('lastBackupTimestamp');
+  if (!last) { el.textContent = 'Abhi tak koi backup nahi liya gaya.'; return; }
+  const days = Math.floor((Date.now() - Number(last)) / 86400000);
+  el.textContent = days <= 0 ? 'Aaj backup liya gaya.' : `${days} din pehle backup liya gaya.`;
+}
+
+async function maybeAutoBackup() {
+  const hasData = fuelEntries.length > 0 || serviceRecords.length > 0 || documents.length > 0;
+  if (!hasData) return;
+  const last = Number(localStorage.getItem('lastBackupTimestamp') || 0);
+  const daysSince = (Date.now() - last) / 86400000;
+  if (!last || daysSince >= BACKUP_INTERVAL_DAYS) {
+    await exportBackup(true);
+  }
+}
+
 // ---------------- Init ----------------
 function refreshAll() {
   renderPumpChips();
@@ -772,10 +1033,13 @@ async function init() {
   renderFuelHistory();
   renderServiceStatus();
   renderNotifStatus();
+  loadVehicleMeta();
+  renderBackupStatus();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./service-worker.js').catch(() => {});
   }
+  maybeAutoBackup();
 }
 init();
 </script>
