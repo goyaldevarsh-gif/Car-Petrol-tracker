@@ -394,6 +394,18 @@ tr:hover td { background: var(--paper-dim); }
   </div>
 </div>
 
+<div class="modal-overlay" id="lightboxOverlay" onclick="closeLightboxOnOverlay(event)">
+  <div class="modal-card">
+    <div class="modal-header">
+      <p class="modal-title">Document</p>
+      <button class="modal-close" onclick="closeLightbox()">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:12px;">
+      <img id="lightboxImg" style="max-width:100%;max-height:70vh;border-radius:8px;" />
+    </div>
+  </div>
+</div>
+
 <script>
 // ---------------- IndexedDB helpers ----------------
 const DB_NAME = 'PetrolTrackerDB';
@@ -849,7 +861,39 @@ function saveVehicleMeta() {
 function openMaintModal() { document.getElementById('maintModalOverlay').classList.add('open'); }
 function closeMaintModal() { document.getElementById('maintModalOverlay').classList.remove('open'); }
 function closeMaintModalOnOverlay(e) { if (e.target.id === 'maintModalOverlay') closeMaintModal(); }
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMaintModal(); });
+
+function dataUrlToBlob(dataUrl) {
+  const [header, base64] = dataUrl.split(',');
+  const mimeMatch = header.match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+  const binary = atob(base64);
+  const array = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+  return new Blob([array], { type: mime });
+}
+function viewDocument(id) {
+  const doc = documents.find((d) => d.id === id);
+  if (!doc) { showToast('Document nahi mila.'); return; }
+  if (doc.mimeType.startsWith('image/')) {
+    document.getElementById('lightboxImg').src = doc.dataUrl;
+    document.getElementById('lightboxOverlay').classList.add('open');
+  } else {
+    try {
+      const blob = dataUrlToBlob(doc.dataUrl);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      showToast('File khulne mein dikkat hui.');
+    }
+  }
+}
+function closeLightbox() { document.getElementById('lightboxOverlay').classList.remove('open'); }
+function closeLightboxOnOverlay(e) { if (e.target.id === 'lightboxOverlay') closeLightbox(); }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeMaintModal(); closeLightbox(); }
+});
 
 // ---------------- Service Notes (for mechanic) ----------------
 function getServiceNotes() {
@@ -959,7 +1003,7 @@ function renderDocuments() {
   if (items.length === 0) { wrap.innerHTML = `<div class="empty">Is category mein koi document nahi hai abhi.</div>`; return; }
   wrap.innerHTML = `<div class="doc-list">${items.map((d) => {
     const isImg = d.mimeType.startsWith('image/');
-    const thumb = isImg ? `<img class="doc-thumb" src="${d.dataUrl}" />` : `<div class="doc-thumb pdf">PDF</div>`;
+    const thumb = isImg ? `<img class="doc-thumb" src="${d.dataUrl}" onclick="viewDocument(${d.id})" style="cursor:pointer;" />` : `<div class="doc-thumb pdf">PDF</div>`;
     return `<div class="doc-item">
       ${thumb}
       <div class="doc-meta">
@@ -967,7 +1011,7 @@ function renderDocuments() {
         <div class="doc-sub">${activeDocCategory === 'All' ? escapeHtml(d.category) + ' · ' : ''}${fmtDate(d.uploadedDate)}${d.note ? ' · ' + escapeHtml(d.note) : ''}</div>
       </div>
       <div class="doc-actions">
-        <a href="${d.dataUrl}" download="${escapeHtml(d.fileName)}" class="btn secondary" style="padding:6px 9px;font-size:11px;">View</a>
+        <button class="btn secondary" style="padding:6px 9px;font-size:11px;" onclick="viewDocument(${d.id})">View</button>
         ${delBtnHtml('documents', d.id)}
       </div>
     </div>`;
