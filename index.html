@@ -9,6 +9,7 @@
 <link rel="apple-touch-icon" href="./icon-192.png" />
 <link rel="icon" href="./icon-192.png" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap');
 
@@ -295,6 +296,19 @@ tr:hover td { background: var(--paper-dim); }
       <p class="card-title">🗓️ Service History</p>
       <div id="serviceHistoryWrap"></div>
     </div>
+
+    <div class="card">
+      <p class="card-title">📝 Service Notes</p>
+      <div class="form-grid">
+        <div class="field full">
+          <label>Naya Note (jo bhi dikkat/complaint hai)</label>
+          <input type="text" id="newServiceNote" placeholder="e.g. AC thandi kam kar rahi hai" />
+        </div>
+        <button class="btn full" onclick="addServiceNote()">➕ Add Note</button>
+      </div>
+      <div id="serviceNotesList" style="margin-top:12px;"></div>
+      <button class="btn secondary full" style="margin-top:12px;" onclick="shareNotesPdf()">📄 Mechanic ko PDF Share Karo</button>
+    </div>
   </div>
 
   <!-- DOCUMENTS TAB -->
@@ -441,7 +455,7 @@ async function dbClear(store) {
 let fuelEntries = [];
 let serviceRecords = [];
 let documents = [];
-let activeDocCategory = 'Insurance';
+let activeDocCategory = 'All';
 let confirmDelId = null; // format: "store:id"
 let charts = {};
 
@@ -775,6 +789,7 @@ function renderServiceTab() {
   renderServiceStatus();
   renderNotifStatus();
   renderServiceHistory();
+  renderServiceNotes();
 }
 
 async function handleAddService() {
@@ -836,11 +851,100 @@ function closeMaintModal() { document.getElementById('maintModalOverlay').classL
 function closeMaintModalOnOverlay(e) { if (e.target.id === 'maintModalOverlay') closeMaintModal(); }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMaintModal(); });
 
+// ---------------- Service Notes (for mechanic) ----------------
+function getServiceNotes() {
+  try { return JSON.parse(localStorage.getItem('serviceNotesList') || '[]'); } catch (e) { return []; }
+}
+function saveServiceNotes(notes) { localStorage.setItem('serviceNotesList', JSON.stringify(notes)); }
+
+function addServiceNote() {
+  const input = document.getElementById('newServiceNote');
+  const text = input.value.trim();
+  if (!text) return;
+  const notes = getServiceNotes();
+  notes.push({ id: Date.now().toString(), date: todayISO(), text });
+  saveServiceNotes(notes);
+  input.value = '';
+  renderServiceNotes();
+}
+function deleteServiceNote(id) {
+  saveServiceNotes(getServiceNotes().filter((n) => n.id !== id));
+  renderServiceNotes();
+}
+function renderServiceNotes() {
+  const wrap = document.getElementById('serviceNotesList');
+  if (!wrap) return;
+  const notes = getServiceNotes().sort((a, b) => b.date.localeCompare(a.date));
+  if (notes.length === 0) { wrap.innerHTML = '<div class="empty">Koi note nahi hai abhi.</div>'; return; }
+  wrap.innerHTML = notes.map((n) => `
+    <div class="doc-item">
+      <div class="doc-meta">
+        <div class="doc-sub">${fmtDate(n.date)}</div>
+        <div class="doc-name" style="white-space:normal;">${escapeHtml(n.text)}</div>
+      </div>
+      <button class="del-btn" onclick="deleteServiceNote('${n.id}')">🗑️</button>
+    </div>`).join('');
+}
+
+function generateNotesPdf() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text('Service Notes', 14, 18);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Generated: ${fmtDate(todayISO())}`, 14, 25);
+  let y = 36;
+  const notes = getServiceNotes().sort((a, b) => a.date.localeCompare(b.date));
+  if (notes.length === 0) {
+    doc.text('Koi notes nahi hain.', 14, y);
+  } else {
+    notes.forEach((n, i) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${i + 1}. ${fmtDate(n.date)}`, 14, y);
+      y += 6;
+      doc.setFont('helvetica', 'normal');
+      const lines = doc.splitTextToSize(n.text, 180);
+      doc.text(lines, 14, y);
+      y += lines.length * 6 + 6;
+    });
+  }
+  return doc;
+}
+
+async function shareNotesPdf() {
+  if (getServiceNotes().length === 0) { showToast('Pehle kuch notes daalo.'); return; }
+  const doc = generateNotesPdf();
+  const blob = doc.output('blob');
+  const fileName = `service-notes-${todayISO()}.pdf`;
+  const file = new File([blob], fileName, { type: 'application/pdf' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: 'Service Notes' });
+      return;
+    } catch (e) {
+      // user cancelled share sheet — fall through to download
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  showToast('📄 PDF downloaded ho gayi');
+}
+
 // ---------------- Documents ----------------
 const DOC_CATEGORIES = ['Insurance', 'RC', 'Driving License', 'Other'];
+const DOC_FILTER_TABS = ['All', ...DOC_CATEGORIES];
 
 function renderDocCatTabs() {
-  document.getElementById('docCatTabs').innerHTML = DOC_CATEGORIES.map((c) =>
+  document.getElementById('docCatTabs').innerHTML = DOC_FILTER_TABS.map((c) =>
     `<button class="doc-cat-tab ${c === activeDocCategory ? 'active' : ''}" onclick="setDocCategory('${c}')">${c}</button>`
   ).join('');
 }
@@ -848,8 +952,9 @@ function setDocCategory(c) { activeDocCategory = c; renderDocuments(); }
 
 function renderDocuments() {
   renderDocCatTabs();
-  document.getElementById('docListTitle').textContent = activeDocCategory;
-  const items = documents.filter((d) => d.category === activeDocCategory).sort((a, b) => b.uploadedDate.localeCompare(a.uploadedDate));
+  document.getElementById('docListTitle').textContent = activeDocCategory === 'All' ? 'Saare Documents' : activeDocCategory;
+  const items = (activeDocCategory === 'All' ? documents : documents.filter((d) => d.category === activeDocCategory))
+    .sort((a, b) => b.uploadedDate.localeCompare(a.uploadedDate));
   const wrap = document.getElementById('docListWrap');
   if (items.length === 0) { wrap.innerHTML = `<div class="empty">Is category mein koi document nahi hai abhi.</div>`; return; }
   wrap.innerHTML = `<div class="doc-list">${items.map((d) => {
@@ -859,7 +964,7 @@ function renderDocuments() {
       ${thumb}
       <div class="doc-meta">
         <div class="doc-name">${escapeHtml(d.fileName)}</div>
-        <div class="doc-sub">${fmtDate(d.uploadedDate)}${d.note ? ' · ' + escapeHtml(d.note) : ''}</div>
+        <div class="doc-sub">${activeDocCategory === 'All' ? escapeHtml(d.category) + ' · ' : ''}${fmtDate(d.uploadedDate)}${d.note ? ' · ' + escapeHtml(d.note) : ''}</div>
       </div>
       <div class="doc-actions">
         <a href="${d.dataUrl}" download="${escapeHtml(d.fileName)}" class="btn secondary" style="padding:6px 9px;font-size:11px;">View</a>
@@ -879,21 +984,26 @@ async function handleAddDocument() {
   if (!file) { errEl.textContent = 'File select karo.'; return; }
   if (file.size > 8 * 1024 * 1024) { errEl.textContent = 'File 8MB se chhoti honi chahiye.'; return; }
 
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('File padhi nahi ja saki.'));
+      reader.readAsDataURL(file);
+    });
 
-  const entry = { category, note, fileName: file.name, mimeType: file.type || 'application/octet-stream', dataUrl, uploadedDate: todayISO() };
-  const id = await dbAdd('documents', entry);
-  documents.push({ ...entry, id });
+    const entry = { category, note, fileName: file.name, mimeType: file.type || 'application/octet-stream', dataUrl, uploadedDate: todayISO() };
+    const id = await dbAdd('documents', entry);
+    documents.push({ ...entry, id });
 
-  document.getElementById('dNote').value = '';
-  fileInput.value = '';
-  activeDocCategory = category;
-  renderDocuments();
+    document.getElementById('dNote').value = '';
+    fileInput.value = '';
+    activeDocCategory = 'All';
+    renderDocuments();
+    showToast('✅ Document upload ho gaya');
+  } catch (err) {
+    errEl.textContent = 'Upload fail hua: ' + (err && err.message ? err.message : 'dobara try karo.');
+  }
 }
 
 // ---------------- Toast ----------------
@@ -1025,9 +1135,13 @@ async function init() {
   document.getElementById('fAmount').addEventListener('input', updateFuelPreview);
   document.getElementById('fPrice').addEventListener('input', updateFuelPreview);
 
-  fuelEntries = await dbGetAll('fuel');
-  serviceRecords = await dbGetAll('service');
-  documents = await dbGetAll('documents');
+  try {
+    fuelEntries = await dbGetAll('fuel');
+    serviceRecords = await dbGetAll('service');
+    documents = await dbGetAll('documents');
+  } catch (err) {
+    showToast('Data load karne mein dikkat hui: ' + (err && err.message ? err.message : 'try again'));
+  }
 
   renderPumpChips();
   renderFuelHistory();
